@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: dark --default;
+}
+
+@theme static {
+  --color-background: #1c1c1e;
+  --color-sidebar: #161618;
+  --color-border: #111113;
+}
+
+@plugin "daisyui/theme" {
+  name: "dark";
+  default: true;
+  --color-base-100: var(--color-background);
+  --color-base-200: var(--color-sidebar);
+  --color-base-300: var(--color-border);
+  --color-primary: #0a84ff;
+  --color-primary-content: #ffffff;
+}

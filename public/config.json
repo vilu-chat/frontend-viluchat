@@ -1,0 +1,10 @@
+{
+  "keycloak": {
+    "url": "/auth",
+    "realm": "viluchat",
+    "clientId": "viluchat-frontend"
+  },
+  "apiBaseUrl": "/api",
+  "wsUrl": "/ws",
+  "vapidPublicKey": ""
+}

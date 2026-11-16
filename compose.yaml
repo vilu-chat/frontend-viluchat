@@ -1,0 +1,13 @@
+# Runs the production image locally (nginx serving the built app).
+# For day-to-day development with hot reload, use `npm run dev` instead.
+services:
+  frontend:
+    build: .
+    image: viluchat-frontend:0.1.0
+    ports:
+      - "3000:8080"
+    volumes:
+      - ./public/config.json:/usr/share/nginx/html/config.json:ro
+    read_only: true
+    tmpfs:
+      - /tmp
