@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': { target, changeOrigin: true },
         '/auth': { target, changeOrigin: true },
+        // Dev auth stub: token endpoint and the seeded users for the login picker.
+        '/realms': { target, changeOrigin: true },
+        '/dev/users': { target, changeOrigin: true },
         '/ws': { target, changeOrigin: true, ws: true },
       },
     },

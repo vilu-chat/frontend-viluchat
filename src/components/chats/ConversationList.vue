@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useConversationStore } from '@/stores/conversations'
 import ConversationListItem from '@/components/chats/ConversationListItem.vue'
 
 const store = useConversationStore()
+
+onMounted(store.fetchConversations)
 </script>
 
 <template>
@@ -13,6 +16,9 @@ const store = useConversationStore()
     >
       Messages
     </h2>
+    <p v-if="store.error && !store.sortedConversations.length" class="px-2 py-1 text-sm text-error">
+      Couldn't load conversations.
+    </p>
     <ul>
       <li v-for="conversation in store.sortedConversations" :key="conversation.id">
         <ConversationListItem :conversation="conversation" />

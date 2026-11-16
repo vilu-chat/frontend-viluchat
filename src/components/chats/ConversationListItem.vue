@@ -9,6 +9,7 @@ const props = defineProps<{ conversation: Conversation }>()
 
 const preview = computed(() => {
   const { lastMessage, type } = props.conversation
+  if (!lastMessage) return 'No messages yet'
   if (lastMessage.fromMe) return `You: ${lastMessage.text}`
   if (type === 'group') return `${lastMessage.senderName.split(' ')[0]}: ${lastMessage.text}`
   return lastMessage.text
@@ -35,6 +36,7 @@ const preview = computed(() => {
         <div class="flex items-baseline gap-2">
           <span class="flex-1 truncate font-semibold">{{ conversation.name }}</span>
           <time
+            v-if="conversation.lastMessage"
             :datetime="conversation.lastMessage.sentAt"
             class="shrink-0 text-xs"
             :class="isExactActive ? 'text-primary-content/80' : 'text-base-content/60'"

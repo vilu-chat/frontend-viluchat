@@ -1,7 +1,7 @@
 node_modules
 dist
 *.local
-.env.local
+.env
 *.tsbuildinfo
 .vscode/*
 !.vscode/extensions.json

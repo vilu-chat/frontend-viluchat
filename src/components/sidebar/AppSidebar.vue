@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import SearchBar from '@/components/shared/SearchBar.vue'
 import SidebarTabs from '@/components/sidebar/SidebarTabs.vue'
+import CurrentUserCard from '@/components/sidebar/CurrentUserCard.vue'
 
 const search = ref('')
 </script>
@@ -14,6 +15,6 @@ const search = ref('')
     <div class="-mx-2 min-h-0 flex-1 overflow-y-auto">
       <RouterView name="sidebar" />
     </div>
-    <!-- later: <CurrentUserCard /> -->
+    <CurrentUserCard />
   </div>
 </template>

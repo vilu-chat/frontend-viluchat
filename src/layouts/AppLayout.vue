@@ -1,5 +1,12 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import AppSidebar from '@/components/sidebar/AppSidebar.vue'
+import { useUserStore } from '@/stores/users'
+
+const users = useUserStore()
+
+// Needed to tell own messages apart (`fromMe`) and to name direct chats after the other member.
+onMounted(users.fetchMe)
 </script>
 
 <template>
@@ -25,4 +32,3 @@ import AppSidebar from '@/components/sidebar/AppSidebar.vue'
     </aside>
   </div>
 </template>
-´

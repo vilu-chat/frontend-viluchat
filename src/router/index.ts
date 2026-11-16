@@ -1,9 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
+import { isLoggedIn } from '@/lib/auth'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** Reachable without being logged in. */
+    public?: boolean
+  }
+}
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { public: true },
+    },
     {
       path: '/',
       component: AppLayout,
@@ -25,4 +39,12 @@ export const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach((to) => {
+  // Switching users goes through logout(), which reloads the page and clears all cached data.
+  if (to.name === 'login' && isLoggedIn()) return { name: 'chats' }
+  if (!to.meta.public && !isLoggedIn()) {
+    return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }
+  }
 })
