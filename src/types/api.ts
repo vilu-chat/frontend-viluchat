@@ -97,6 +97,12 @@ export interface ConversationSummary {
   unread_count: number
   last_message: Message | null
   updated_at: string
+  /** The caller's read position. */
+  last_read_seq: number
+  /** Active members, the caller included. */
+  member_count: number
+  /** Up to 4 active members other than the caller, oldest join first (for a direct chat: the peer). */
+  member_preview_ids: string[]
 }
 
 export interface ConversationPage {

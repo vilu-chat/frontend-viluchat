@@ -13,7 +13,7 @@ defineProps<{
 <template>
   <RouterLink
     :to="to"
-    class="flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-xs text-base-content/60 transition-colors hover:bg-base-content/5 hover:text-base-content"
+    class="flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-xs text-base-content/60 transition-colors hover:bg-hover-subtle hover:text-base-content"
     active-class="!bg-base-content/10 !text-base-content"
   >
     <span class="relative">

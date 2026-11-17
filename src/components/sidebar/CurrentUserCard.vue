@@ -13,7 +13,7 @@ const statusText = computed(() => users.me?.status_text ?? `@${currentSession.va
 </script>
 
 <template>
-  <div v-if="currentSession" class="flex items-center gap-3 border-t border-border pt-3">
+  <div v-if="currentSession" class="flex items-center gap-3 border-t bg-/25 pt-3">
     <UserAvatar :name="name" />
     <div class="min-w-0 flex-1">
       <div class="truncate font-semibold">{{ name }}</div>

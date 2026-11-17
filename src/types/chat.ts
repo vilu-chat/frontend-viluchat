@@ -22,6 +22,8 @@ export interface Conversation {
   /** Absent for conversations without messages yet. */
   lastMessage?: MessagePreview
   unreadCount: number
+  /** Active members, the current user included. */
+  memberCount: number
 }
 
 /** A message we sent that the server hasn't confirmed yet (or that failed). */

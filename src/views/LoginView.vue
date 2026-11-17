@@ -76,7 +76,7 @@ onMounted(loadUsers)
 
         <div v-else-if="loadError" role="alert" class="py-4 text-center text-sm">
           <p class="text-error">{{ loadError }}</p>
-          <button type="button" class="btn mt-3 btn-sm" @click="loadUsers">Try again</button>
+          <button type="button" class="ui-btn ui-btn-ghost mt-3 bg-hover" @click="loadUsers">Try again</button>
         </div>
 
         <p v-else-if="!users.length" class="py-6 text-center text-sm text-base-content/60">No users available.</p>
@@ -85,7 +85,7 @@ onMounted(loadUsers)
           <li v-for="user in users" :key="user.id">
             <button
               type="button"
-              class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-base-content/5 disabled:opacity-60"
+              class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-hover-subtle disabled:opacity-60"
               :disabled="loggingInAs !== null"
               :aria-busy="loggingInAs === user.id"
               @click="pick(user)"

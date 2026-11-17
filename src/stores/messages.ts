@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import * as messageApi from '@/services/messageService'
 import { useConversationStore } from '@/stores/conversations'
+import { useUserStore } from '@/stores/users'
 import type { Message } from '@/types/api'
 import type { ConversationMessages } from '@/types/chat'
 import { ApiError } from '@/utils/http'
@@ -14,7 +15,15 @@ function emptyState(): ConversationMessages {
 
 export const useMessageStore = defineStore('messages', () => {
   const conversations = useConversationStore()
+  const users = useUserStore()
   const byConversation = ref<Record<string, ConversationMessages>>({})
+  /** Unsent composer text per conversation. Not persisted. */
+  const drafts = ref<Record<string, string>>({})
+
+  function setDraft(conversationId: string, text: string): void {
+    if (text) drafts.value[conversationId] = text
+    else delete drafts.value[conversationId]
+  }
 
   /** Per-conversation state, created on first use. Returns the reactive proxy, so mutations are tracked. */
   function stateFor(conversationId: string): ConversationMessages {
@@ -39,6 +48,7 @@ export const useMessageStore = defineStore('messages', () => {
     state.outgoing = state.outgoing.filter((o) => !confirmed.has(o.client_msg_id))
 
     conversations.applyMessage(state.messages[state.messages.length - 1]!)
+    users.ensureUsers(incoming.map((m) => m.sender_id)).catch(() => {})
   }
 
   async function withLoading(conversationId: string, fn: (state: ConversationMessages) => Promise<void>) {
@@ -152,5 +162,5 @@ export const useMessageStore = defineStore('messages', () => {
     state.outgoing = state.outgoing.filter((o) => o.client_msg_id !== clientMsgId)
   }
 
-  return { byConversation, get, stateFor, loadLatest, loadOlder, sync, send, retry, discard }
+  return { byConversation, drafts, setDraft, get, stateFor, loadLatest, loadOlder, sync, send, retry, discard }
 })

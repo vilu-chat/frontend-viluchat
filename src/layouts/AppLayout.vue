@@ -12,7 +12,7 @@ onMounted(users.fetchMe)
 <template>
   <div class="flex h-screen overflow-hidden bg-background text-base-content">
     <!-- Left: navigation sidebar -->
-    <aside class="flex w-80 shrink-0 flex-col border-r border-border bg-sidebar">
+    <aside class="flex w-70 shrink-0 flex-col border-r border-border bg-sidebar">
       <AppSidebar />
     </aside>
 
@@ -27,7 +27,7 @@ onMounted(users.fetchMe)
     </main>
 
     <!-- Right: contextual panel → replace with <FilesPanel /> -->
-    <aside class="hidden w-80 shrink-0 flex-col border-l border-border bg-sidebar xl:flex">
+    <aside class="w-70 shrink-0 flex-col border-l border-border bg-sidebar">
       <div class="p-4 font-semibold">Files panel</div>
     </aside>
   </div>

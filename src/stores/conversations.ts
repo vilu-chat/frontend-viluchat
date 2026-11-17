@@ -7,17 +7,24 @@ import type { ChatUser, Conversation } from '@/types/chat'
 import { ApiError } from '@/utils/http'
 
 const PAGE_SIZE = 30
+const MEMBER_PREVIEW_SIZE = 4
 
-/** Summary-shaped view of a conversation we only know through its details (e.g. just created). */
-function summaryFromDetails(c: ApiConversation): ConversationSummary {
+/** For conversations we only know through their details, e.g. one we just created. */
+function summaryFromDetails(conversation: ApiConversation, myId: string | undefined): ConversationSummary {
   return {
-    id: c.id,
-    type: c.type,
-    title: c.title,
+    id: conversation.id,
+    type: conversation.type,
+    title: conversation.title,
     last_message: null,
-    last_seq: c.last_seq,
+    last_seq: conversation.last_seq,
     unread_count: 0,
-    updated_at: c.updated_at,
+    updated_at: conversation.updated_at,
+    last_read_seq: conversation.last_seq,
+    member_count: conversation.members.length,
+    member_preview_ids: conversation.members
+      .map((member) => member.user_id)
+      .filter((id) => id !== myId)
+      .slice(0, MEMBER_PREVIEW_SIZE),
   }
 }
 
@@ -30,6 +37,7 @@ export const useConversationStore = defineStore('conversations', () => {
   const nextCursor = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<ApiError | null>(null)
+  const firstPageLoaded = ref(false)
 
   /** Bumped on every first-page load so a stale response can't overwrite a newer one. */
   let listGeneration = 0
@@ -40,8 +48,11 @@ export const useConversationStore = defineStore('conversations', () => {
 
   function toListItem(s: ConversationSummary): Conversation {
     const meId = users.me?.id
-    const others = (details.value[s.id]?.members ?? []).filter((m) => m.user_id !== meId)
-    const members: ChatUser[] = others.map((m) => ({ id: m.user_id, name: users.displayName(m.user_id) }))
+    const detail = details.value[s.id]
+    const otherMemberIds = detail
+      ? detail.members.map((m) => m.user_id).filter((id) => id !== meId)
+      : s.member_preview_ids
+    const members: ChatUser[] = otherMemberIds.map((id) => ({ id, name: users.displayName(id) }))
 
     const fallbackName = s.type === 'direct' ? (members[0]?.name ?? 'Direct message') : 'Group'
     const last = s.last_message
@@ -60,6 +71,7 @@ export const useConversationStore = defineStore('conversations', () => {
           }
         : undefined,
       unreadCount: s.unread_count,
+      memberCount: detail ? detail.members.length : s.member_count,
     }
   }
 
@@ -74,27 +86,27 @@ export const useConversationStore = defineStore('conversations', () => {
     const summary = summaries.value[id]
     if (summary) return toListItem(summary)
     const detail = details.value[id]
-    return detail ? toListItem(summaryFromDetails(detail)) : undefined
+    return detail ? toListItem(summaryFromDetails(detail, users.me?.id)) : undefined
   }
 
   // ---------------------------------------------------------------------------
   // Loading
   // ---------------------------------------------------------------------------
 
-  /**
-   * Fills in what the list needs beyond the summaries: details of direct conversations (to find the
-   * peer, since summaries carry no members) and the profiles of members and last-message senders.
-   * Failures here are non-fatal: the list falls back to placeholder names.
-   */
-  async function hydrate(items: ConversationSummary[]): Promise<void> {
-    // API gap: drop this step once ConversationSummary exposes members / peer_user_id.
-    const directIds = items.filter((s) => s.type === 'direct' && !details.value[s.id]).map((s) => s.id)
-    await Promise.allSettled(directIds.map(loadDetails))
+  /** The list then shows the summary's member preview until the chat is opened again. */
+  function dropDetailsWithOutdatedMembers(items: ConversationSummary[]): void {
+    for (const summary of items) {
+      const detail = details.value[summary.id]
+      if (detail && detail.members.length !== summary.member_count) delete details.value[summary.id]
+    }
+  }
 
+  /** Failures are ignored: the list falls back to placeholder names. */
+  async function loadUsersShownIn(items: ConversationSummary[]): Promise<void> {
     const userIds = new Set<string>()
-    for (const s of items) {
-      if (s.last_message) userIds.add(s.last_message.sender_id)
-      for (const m of details.value[s.id]?.members ?? []) userIds.add(m.user_id)
+    for (const summary of items) {
+      if (summary.last_message) userIds.add(summary.last_message.sender_id)
+      for (const id of summary.member_preview_ids) userIds.add(id)
     }
     await users.ensureUsers(userIds).catch(() => {})
   }
@@ -112,10 +124,13 @@ export const useConversationStore = defineStore('conversations', () => {
     error.value = null
     try {
       const page = await messageApi.listConversations({ limit: PAGE_SIZE })
+      const items = page.items
       if (generation !== listGeneration) return
-      summaries.value = Object.fromEntries(page.items.map((s) => [s.id, s]))
+      summaries.value = Object.fromEntries(items.map((s) => [s.id, s]))
       nextCursor.value = page.next_cursor
-      await hydrate(page.items)
+      firstPageLoaded.value = true
+      dropDetailsWithOutdatedMembers(items)
+      await loadUsersShownIn(items)
     } catch (e) {
       if (generation === listGeneration) error.value = ApiError.from(e)
     } finally {
@@ -123,18 +138,25 @@ export const useConversationStore = defineStore('conversations', () => {
     }
   }
 
-  /** Appends the next page, if any. */
-  async function fetchMore(): Promise<void> {
+  /** Unlike `fetchConversations`, keeps pages already scrolled in (e.g. when switching sidebar tabs). */
+  function loadConversationsOnce(): Promise<void> {
+    if (firstPageLoaded.value || loading.value) return Promise.resolve()
+    return fetchConversations()
+  }
+
+  async function fetchNextPage(): Promise<void> {
     if (!nextCursor.value || loading.value) return
     const generation = listGeneration
     loading.value = true
     error.value = null
     try {
       const page = await messageApi.listConversations({ limit: PAGE_SIZE, cursor: nextCursor.value })
+      const items = page.items
       if (generation !== listGeneration) return
-      for (const s of page.items) summaries.value[s.id] = s
+      for (const s of items) summaries.value[s.id] = s
       nextCursor.value = page.next_cursor
-      await hydrate(page.items)
+      dropDetailsWithOutdatedMembers(items)
+      await loadUsersShownIn(items)
     } catch (e) {
       if (generation === listGeneration) error.value = ApiError.from(e)
     } finally {
@@ -155,7 +177,7 @@ export const useConversationStore = defineStore('conversations', () => {
 
   function adopt(conversation: ApiConversation) {
     details.value[conversation.id] = conversation
-    summaries.value[conversation.id] ??= summaryFromDetails(conversation)
+    summaries.value[conversation.id] ??= summaryFromDetails(conversation, users.me?.id)
   }
 
   async function openDirect(userId: string): Promise<ApiConversation> {
@@ -178,12 +200,17 @@ export const useConversationStore = defineStore('conversations', () => {
     if (!summary || summary.unread_count === 0 || summary.last_seq <= 0) return
 
     const previousUnread = summary.unread_count
+    const previousReadSeq = summary.last_read_seq
     summary.unread_count = 0
+    summary.last_read_seq = summary.last_seq
     try {
       await messageApi.markRead(id, summary.last_seq)
     } catch {
       // Restore unless something else (e.g. a newer read) already changed it.
-      if (summary.unread_count === 0) summary.unread_count = previousUnread
+      if (summary.unread_count === 0) {
+        summary.unread_count = previousUnread
+        summary.last_read_seq = previousReadSeq
+      }
     }
   }
 
@@ -193,6 +220,8 @@ export const useConversationStore = defineStore('conversations', () => {
     if (!summary || message.seq < summary.last_seq) return
     summary.last_message = message
     summary.last_seq = message.seq
+    // The server marks the sender's own message as read.
+    if (message.sender_id === users.me?.id) summary.last_read_seq = Math.max(summary.last_read_seq, message.seq)
     if (message.created_at > summary.updated_at) summary.updated_at = message.created_at
   }
 
@@ -201,11 +230,13 @@ export const useConversationStore = defineStore('conversations', () => {
     details,
     nextCursor,
     loading,
+    firstPageLoaded,
     error,
     sortedConversations,
     getById,
     fetchConversations,
-    fetchMore,
+    loadConversationsOnce,
+    fetchNextPage,
     fetchConversation,
     openDirect,
     createGroup,

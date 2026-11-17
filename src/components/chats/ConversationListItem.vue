@@ -26,10 +26,14 @@ const preview = computed(() => {
       :href="href"
       :aria-current="isExactActive ? 'page' : undefined"
       class="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors"
-      :class="isExactActive ? 'bg-primary text-primary-content' : 'hover:bg-base-content/5'"
+      :class="isExactActive ? 'bg-primary text-primary-content [--avatar-ring:var(--color-primary)]' : 'hover:bg-hover-subtle'"
       @click="navigate"
     >
-      <GroupAvatar v-if="conversation.type === 'group'" :members="conversation.members" />
+      <GroupAvatar
+        v-if="conversation.type === 'group'"
+        :other-members="conversation.members"
+        :other-member-count="conversation.memberCount - 1"
+      />
       <UserAvatar v-else :name="conversation.name" :online="conversation.members[0]?.online" />
 
       <div class="min-w-0 flex-1">

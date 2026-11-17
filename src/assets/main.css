@@ -5,8 +5,16 @@
 
 @theme static {
   --color-background: #1c1c1e;
-  --color-sidebar: #161618;
-  --color-border: #111113;
+  --color-sidebar: #1c1c1e;
+  --color-border: #313234;
+  --color-chat: #08080b;
+
+  --color-hover-subtle: color-mix(in oklab, var(--color-base-content) 5%, transparent);
+  --color-hover: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+  --color-hover-strong: color-mix(in oklab, var(--color-base-content) 15%, transparent);
+
+  --color-primary-hover: #3395ff;
+  --color-error-hover: #ff5147;
 }
 
 @plugin "daisyui/theme" {
@@ -17,4 +25,21 @@
   --color-base-300: var(--color-border);
   --color-primary: #0a84ff;
   --color-primary-content: #ffffff;
+  --color-error: #ff3b30;
+  --color-error-content: #ffffff;
+}
+
+@layer components {
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .ui-btn-primary {
+    @apply bg-primary text-primary-content hover:bg-primary-hover disabled:hover:bg-primary;
+  }
+  .ui-btn-danger {
+    @apply bg-error text-error-content hover:bg-error-hover disabled:hover:bg-error;
+  }
+  .ui-btn-ghost {
+    @apply text-base-content/80 hover:bg-hover hover:text-base-content disabled:hover:bg-transparent;
+  }
 }

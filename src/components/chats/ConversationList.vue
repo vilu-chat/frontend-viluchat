@@ -2,10 +2,11 @@
 import { onMounted } from 'vue'
 import { useConversationStore } from '@/stores/conversations'
 import ConversationListItem from '@/components/chats/ConversationListItem.vue'
+import LoadMoreConversations from '@/components/chats/LoadMoreConversations.vue'
 
 const store = useConversationStore()
 
-onMounted(store.fetchConversations)
+onMounted(store.loadConversationsOnce)
 </script>
 
 <template>
@@ -24,5 +25,6 @@ onMounted(store.fetchConversations)
         <ConversationListItem :conversation="conversation" />
       </li>
     </ul>
+    <LoadMoreConversations />
   </section>
 </template>
