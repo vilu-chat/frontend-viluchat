@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Users } from '@lucide/vue'
-import type { ChatUser } from '@/types/chat'
+import type { ConversationMember } from '@/types/chat'
 import UserAvatar from '@/components/shared/UserAvatar.vue'
 
 const props = defineProps<{
   /** Everyone except the current user; may be only a preview of the group. */
-  otherMembers: ChatUser[]
+  otherMembers: ConversationMember[]
   /** Defaults to `otherMembers.length`. */
   otherMemberCount?: number
 }>()

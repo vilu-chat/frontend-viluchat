@@ -28,6 +28,7 @@ export interface ApiErrorBody {
 /** Own profile (`GET /api/v1/users/me`; the row is created on the first call). */
 export interface UserMe {
   id: string
+  username: string | null
   display_name: string
   bio: string | null
   status_text: string | null
@@ -40,6 +41,7 @@ export interface UserMe {
 /** Public profile of another user. */
 export interface User {
   id: string
+  username: string | null
   display_name: string
   bio: string | null
   status_text: string | null
@@ -63,6 +65,22 @@ export interface UserUpdate {
 /** `POST /api/v1/users/lookup` body (1–100 ids). Responds with `User[]`; unknown/deleted users are omitted. */
 export interface UserLookup {
   ids: string[]
+}
+
+export type RelationKind = 'contact' | 'pending'
+export type RelationDirection = 'incoming' | 'outgoing'
+
+export interface Relation {
+  other_user_id: string
+  kind: RelationKind
+  direction: RelationDirection | null
+  created_at: string
+  user: User
+}
+
+export interface RelationPage {
+  items: Relation[]
+  next_cursor: string | null
 }
 
 // ---------------------------------------------------------------------------

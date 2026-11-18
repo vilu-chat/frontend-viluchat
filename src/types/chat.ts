@@ -1,7 +1,7 @@
 import type { Message, MessageKind } from '@/types/api'
 import type { ApiError } from '@/utils/http'
 
-export interface ChatUser {
+export interface ConversationMember {
   id: string
   name: string
   online?: boolean
@@ -14,11 +14,11 @@ export interface MessagePreview {
   fromMe: boolean
 }
 
-export interface Conversation {
+export interface ConversationListItem {
   id: string
   type: 'direct' | 'group'
   name: string
-  members: ChatUser[]
+  members: ConversationMember[]
   /** Absent for conversations without messages yet. */
   lastMessage?: MessagePreview
   unreadCount: number

@@ -10,8 +10,8 @@ import DeleteAccountDialog from '@/components/profile/DeleteAccountDialog.vue'
 const users = useUserStore()
 
 // Profile from `GET /users/me` once loaded; the name from the login until then.
-const name = computed(() => users.me?.display_name ?? currentSession.value?.user.name ?? '')
-const statusText = computed(() => users.me?.status_text ?? `@${currentSession.value?.user.preferred_username ?? ''}`)
+const name = computed(() => users.currentUser?.display_name ?? currentSession.value?.user.name ?? '')
+const statusText = computed(() => users.currentUser?.status_text ?? `@${currentSession.value?.user.preferred_username ?? ''}`)
 
 const profileOpen = ref(false)
 const deleteOpen = ref(false)

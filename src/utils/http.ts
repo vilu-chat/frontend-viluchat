@@ -5,9 +5,9 @@ import type { ApiErrorBody } from '@/types/api'
 export class ApiError extends Error {
   readonly status: number
   /** `code` from the error body (the HTTP status as reported by the service). */
-  readonly code: number | undefined
+  readonly httpStatusFromBody: number | undefined
   /** `status` from the error body, e.g. `Unprocessable Entity`. */
-  readonly statusName: string | undefined
+  readonly httpStatusText: string | undefined
   /** Validation details from the error body (422), keyed by field/location. */
   readonly errors: Record<string, unknown>
   /** `error_code` from the error body, e.g. `account_deleted`. */
@@ -17,8 +17,8 @@ export class ApiError extends Error {
     super(message, options)
     this.name = 'ApiError'
     this.status = status
-    this.code = body?.code
-    this.statusName = body?.status
+    this.httpStatusFromBody = body?.code
+    this.httpStatusText = body?.status
     this.errors = body?.errors ?? {}
     this.errorCode = body?.error_code
   }
@@ -95,7 +95,7 @@ async function parseErrorBody(res: Response): Promise<ApiErrorBody | undefined> 
   }
 }
 
-async function send(method: HttpMethod, path: string, options: RequestOptions, token: string | null) {
+async function sendRequest(method: HttpMethod, path: string, options: RequestOptions, token: string | null) {
   const { query, body, signal } = options
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -115,12 +115,12 @@ async function send(method: HttpMethod, path: string, options: RequestOptions, t
 }
 
 export async function request<T>(method: HttpMethod, path: string, options: RequestOptions = {}): Promise<T> {
-  let res = await send(method, path, options, tokenProvider ? await tokenProvider() : null)
+  let res = await sendRequest(method, path, options, tokenProvider ? await tokenProvider() : null)
 
   // Expired or revoked token: get a fresh one and retry once.
   if (res.status === 401 && tokenRefresher) {
     const fresh = await tokenRefresher()
-    if (fresh) res = await send(method, path, options, fresh)
+    if (fresh) res = await sendRequest(method, path, options, fresh)
   }
 
   if (!res.ok) {

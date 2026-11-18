@@ -22,12 +22,12 @@ watch(
     const cachedConversation = conversationStore.getById(id)
     if (cachedConversation) {
       // Group members can change, so refresh them in the background.
-      if (cachedConversation.type === 'group') conversationStore.fetchConversation(id).catch(() => {})
+      if (cachedConversation.type === 'group') conversationStore.fetchConversationWithMembers(id).catch(() => {})
       return
     }
     fetching.value = true
     try {
-      await conversationStore.fetchConversation(id)
+      await conversationStore.fetchConversationWithMembers(id)
     } catch {
       // Falls through to "Conversation not found".
     } finally {
@@ -40,7 +40,7 @@ watch(
 watch(
   () => conversation.value?.id,
   (id) => {
-    if (id && !messageStore.get(id)?.loaded) messageStore.loadLatest(id)
+    if (id && !messageStore.findState(id)?.loaded) messageStore.loadLatest(id)
   },
   { immediate: true },
 )
@@ -65,7 +65,7 @@ watch(
     if (!id || unreadCount === undefined) return
     if (firstUnreadSeqCapturedFor !== id) {
       firstUnreadSeqCapturedFor = id
-      const lastReadSeq = conversationStore.summaries[id]?.last_read_seq
+      const lastReadSeq = conversationStore.summariesById[id]?.last_read_seq
       firstUnreadSeq.value = unreadCount && lastReadSeq !== undefined ? lastReadSeq + 1 : null
     }
     if (unreadCount) conversationStore.markAsRead(id)
@@ -85,7 +85,7 @@ const groupSubtitle = computed(() => {
   const group = conversation.value
   if (group?.type !== 'group') return null
   const memberCountText = `${group.memberCount} ${group.memberCount === 1 ? 'member' : 'members'}`
-  if (!conversationStore.details[group.id]) return memberCountText
+  if (!conversationStore.detailsById[group.id]) return memberCountText
   const firstNames = group.members.map((member) => member.name.split(' ')[0])
   return `${memberCountText} · ${firstNames.length ? `${firstNames.join(', ')} and you` : 'Just you'}`
 })

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Conversation } from '@/types/chat'
+import type { ConversationListItem } from '@/types/chat'
 import { formatChatTime } from '@/utils/formatChatTime'
 import GroupAvatar from '@/components/shared/GroupAvatar.vue'
 import UserAvatar from '@/components/shared/UserAvatar.vue'
 
-const props = defineProps<{ conversation: Conversation }>()
+const props = defineProps<{ conversation: ConversationListItem }>()
 
 const preview = computed(() => {
   const { lastMessage, type } = props.conversation

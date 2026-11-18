@@ -7,18 +7,18 @@ import { ApiError } from '@/utils/http'
 const UNKNOWN_USER = 'Unknown user'
 
 export const useUserStore = defineStore('users', () => {
-  const me = ref<UserMe | null>(null)
+  const currentUser = ref<UserMe | null>(null)
   const byId = ref<Record<string, User>>({})
-  const meError = ref<ApiError | null>(null)
+  const currentUserError = ref<ApiError | null>(null)
 
-  // Bookkeeping only, deliberately not reactive.
-  const inFlight = new Map<string, Promise<void>>()
-  const notFound = new Set<string>()
+  const lookupsInFlight = new Map<string, Promise<void>>()
+  const unknownUserIds = new Set<string>()
 
-  function cacheMe(user: UserMe) {
-    me.value = user
+  function cacheCurrentUser(user: UserMe) {
+    currentUser.value = user
     byId.value[user.id] = {
       id: user.id,
+      username: user.username,
       display_name: user.display_name,
       bio: user.bio,
       status_text: user.status_text,
@@ -26,61 +26,56 @@ export const useUserStore = defineStore('users', () => {
     }
   }
 
-  /** Loads the current user. Records failures in `meError` instead of throwing. */
-  async function fetchMe(): Promise<UserMe | null> {
-    meError.value = null
+  async function fetchCurrentUser(): Promise<UserMe | null> {
+    currentUserError.value = null
     try {
-      cacheMe(await userApi.getMe())
-      return me.value
+      cacheCurrentUser(await userApi.getCurrentUser())
+      return currentUser.value
     } catch (e) {
-      meError.value = ApiError.from(e)
+      currentUserError.value = ApiError.from(e)
       return null
     }
   }
 
-  async function updateMe(patch: UserUpdate): Promise<UserMe> {
-    const updated = await userApi.updateMe(patch)
-    cacheMe(updated)
+  async function updateCurrentUser(patch: UserUpdate): Promise<UserMe> {
+    const updated = await userApi.updateCurrentUser(patch)
+    cacheCurrentUser(updated)
     return updated
   }
 
-  async function deleteMe(): Promise<void> {
-    await userApi.deleteMe()
-    if (me.value) delete byId.value[me.value.id]
-    me.value = null
+  async function deleteCurrentUser(): Promise<void> {
+    await userApi.deleteCurrentUser()
+    if (currentUser.value) delete byId.value[currentUser.value.id]
+    currentUser.value = null
   }
 
-  /**
-   * Makes sure profiles for `ids` are cached. Only uncached ids are looked up, in one batched call;
-   * ids already being fetched by another caller reuse that request instead of starting a new one.
-   */
   async function ensureUsers(ids: Iterable<string>): Promise<void> {
-    const waitFor = new Set<Promise<void>>()
-    const missing: string[] = []
+    const lookupsToAwait = new Set<Promise<void>>()
+    const idsToLookUp: string[] = []
 
     for (const id of new Set(ids)) {
-      if (!id || byId.value[id] || notFound.has(id)) continue
-      const pending = inFlight.get(id)
-      if (pending) waitFor.add(pending)
-      else missing.push(id)
+      if (!id || byId.value[id] || unknownUserIds.has(id)) continue
+      const inFlightLookup = lookupsInFlight.get(id)
+      if (inFlightLookup) lookupsToAwait.add(inFlightLookup)
+      else idsToLookUp.push(id)
     }
 
-    if (missing.length) {
-      const req = userApi
-        .lookupUsers(missing)
+    if (idsToLookUp.length) {
+      const lookupRequest = userApi
+        .lookupUsers(idsToLookUp)
         .then((users) => {
           for (const user of users) byId.value[user.id] = user
           const found = new Set(users.map((u) => u.id))
-          for (const id of missing) if (!found.has(id)) notFound.add(id)
+          for (const id of idsToLookUp) if (!found.has(id)) unknownUserIds.add(id)
         })
         .finally(() => {
-          for (const id of missing) inFlight.delete(id)
+          for (const id of idsToLookUp) lookupsInFlight.delete(id)
         })
-      for (const id of missing) inFlight.set(id, req)
-      waitFor.add(req)
+      for (const id of idsToLookUp) lookupsInFlight.set(id, lookupRequest)
+      lookupsToAwait.add(lookupRequest)
     }
 
-    await Promise.all(waitFor)
+    await Promise.all(lookupsToAwait)
   }
 
   function displayName(id: string | null | undefined): string {
@@ -88,5 +83,5 @@ export const useUserStore = defineStore('users', () => {
     return byId.value[id]?.display_name ?? UNKNOWN_USER
   }
 
-  return { me, byId, meError, fetchMe, updateMe, deleteMe, ensureUsers, displayName }
+  return { currentUser, byId, currentUserError, fetchCurrentUser, updateCurrentUser, deleteCurrentUser, ensureUsers, displayName }
 })

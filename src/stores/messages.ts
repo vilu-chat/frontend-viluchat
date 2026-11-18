@@ -16,7 +16,7 @@ function emptyState(): ConversationMessages {
 export const useMessageStore = defineStore('messages', () => {
   const conversations = useConversationStore()
   const users = useUserStore()
-  const byConversation = ref<Record<string, ConversationMessages>>({})
+  const stateByConversationId = ref<Record<string, ConversationMessages>>({})
   /** Unsent composer text per conversation. Not persisted. */
   const drafts = ref<Record<string, string>>({})
 
@@ -25,34 +25,31 @@ export const useMessageStore = defineStore('messages', () => {
     else delete drafts.value[conversationId]
   }
 
-  /** Per-conversation state, created on first use. Returns the reactive proxy, so mutations are tracked. */
-  function stateFor(conversationId: string): ConversationMessages {
-    if (!byConversation.value[conversationId]) byConversation.value[conversationId] = emptyState()
-    return byConversation.value[conversationId]
+  function getOrCreateState(conversationId: string): ConversationMessages {
+    if (!stateByConversationId.value[conversationId]) stateByConversationId.value[conversationId] = emptyState()
+    return stateByConversationId.value[conversationId]
   }
 
-  /** Read-only accessor for templates/computeds (doesn't create state as a side effect). */
-  function get(conversationId: string): ConversationMessages | undefined {
-    return byConversation.value[conversationId]
+  function findState(conversationId: string): ConversationMessages | undefined {
+    return stateByConversationId.value[conversationId]
   }
 
-  /** Merges messages in (deduped by `id`, sorted by `seq`) and drops matching optimistic entries. */
-  function upsert(conversationId: string, incoming: Message[]): void {
+  function mergeMessages(conversationId: string, incoming: Message[]): void {
     if (!incoming.length) return
-    const state = stateFor(conversationId)
-    const merged = new Map(state.messages.map((m) => [m.id, m]))
-    for (const m of incoming) merged.set(m.id, m)
+    const state = getOrCreateState(conversationId)
+    const merged = new Map(state.messages.map((message) => [message.id, message]))
+    for (const message of incoming) merged.set(message.id, message)
     state.messages = [...merged.values()].sort((a, b) => a.seq - b.seq)
 
-    const confirmed = new Set(incoming.map((m) => m.client_msg_id))
+    const confirmed = new Set(incoming.map((message) => message.client_msg_id))
     state.outgoing = state.outgoing.filter((o) => !confirmed.has(o.client_msg_id))
 
     conversations.applyMessage(state.messages[state.messages.length - 1]!)
-    users.ensureUsers(incoming.map((m) => m.sender_id)).catch(() => {})
+    users.ensureUsers(incoming.map((message) => message.sender_id)).catch(() => {})
   }
 
-  async function withLoading(conversationId: string, fn: (state: ConversationMessages) => Promise<void>) {
-    const state = stateFor(conversationId)
+  async function runWithLoadingState(conversationId: string, fn: (state: ConversationMessages) => Promise<void>) {
+    const state = getOrCreateState(conversationId)
     if (state.loading) return
     state.loading = true
     state.error = null
@@ -65,49 +62,46 @@ export const useMessageStore = defineStore('messages', () => {
     }
   }
 
-  /** Loads the newest page. */
   function loadLatest(conversationId: string): Promise<void> {
-    return withLoading(conversationId, async (state) => {
+    return runWithLoadingState(conversationId, async (state) => {
       const page = await messageApi.listMessages(conversationId, { limit: PAGE_SIZE })
-      upsert(conversationId, page.items)
+      mergeMessages(conversationId, page.items)
       state.hasMoreOlder = page.has_more
       state.loaded = true
     })
   }
 
-  /** Loads the page before the oldest loaded message. */
   async function loadOlder(conversationId: string): Promise<void> {
-    const state = stateFor(conversationId)
+    const state = getOrCreateState(conversationId)
     const oldest = state.messages[0]
     if (!oldest) return loadLatest(conversationId)
     if (!state.hasMoreOlder) return
 
-    return withLoading(conversationId, async (s) => {
+    return runWithLoadingState(conversationId, async () => {
       const page = await messageApi.listMessages(conversationId, { before_seq: oldest.seq, limit: PAGE_SIZE })
-      upsert(conversationId, page.items)
-      s.hasMoreOlder = page.has_more
+      mergeMessages(conversationId, page.items)
+      state.hasMoreOlder = page.has_more
     })
   }
 
-  /** Fetches everything after the newest loaded message (e.g. after a websocket reconnect). */
-  async function sync(conversationId: string): Promise<void> {
-    const state = stateFor(conversationId)
+  async function loadMissedMessages(conversationId: string): Promise<void> {
+    const state = getOrCreateState(conversationId)
     if (!state.messages.length) return loadLatest(conversationId)
 
-    return withLoading(conversationId, async (s) => {
-      let afterSeq = s.messages[s.messages.length - 1]!.seq
+    return runWithLoadingState(conversationId, async () => {
+      let afterSeq = state.messages[state.messages.length - 1]!.seq
       for (;;) {
         const page = await messageApi.listMessages(conversationId, { after_seq: afterSeq, limit: PAGE_SIZE })
-        upsert(conversationId, page.items)
-        const newest = page.items.reduce((max, m) => Math.max(max, m.seq), afterSeq)
+        mergeMessages(conversationId, page.items)
+        const newest = page.items.reduce((max, message) => Math.max(max, message.seq), afterSeq)
         if (!page.has_more || newest <= afterSeq) break
         afterSeq = newest
       }
     })
   }
 
-  async function deliver(conversationId: string, clientMsgId: string): Promise<Message | null> {
-    const findOutgoing = () => stateFor(conversationId).outgoing.find((o) => o.client_msg_id === clientMsgId)
+  async function sendOutgoing(conversationId: string, clientMsgId: string): Promise<Message | null> {
+    const findOutgoing = () => getOrCreateState(conversationId).outgoing.find((outgoingMessage) => outgoingMessage.client_msg_id === clientMsgId)
     const outgoing = findOutgoing()
     if (!outgoing) return null
 
@@ -119,7 +113,7 @@ export const useMessageStore = defineStore('messages', () => {
         kind: outgoing.kind,
         body: outgoing.body,
       })
-      upsert(conversationId, [message])
+      mergeMessages(conversationId, [message])
       return message
     } catch (e) {
       const current = findOutgoing()
@@ -131,12 +125,8 @@ export const useMessageStore = defineStore('messages', () => {
     }
   }
 
-  /**
-   * Sends a text message with an optimistic pending entry. Resolves to the confirmed message,
-   * or `null` if it failed (the entry then stays in `outgoing` with `status: 'failed'`).
-   */
   function send(conversationId: string, body: string): Promise<Message | null> {
-    stateFor(conversationId).outgoing.push({
+    getOrCreateState(conversationId).outgoing.push({
       client_msg_id: crypto.randomUUID(),
       conversation_id: conversationId,
       kind: 'text',
@@ -145,22 +135,20 @@ export const useMessageStore = defineStore('messages', () => {
       status: 'pending',
       error: null,
     })
-    const clientMsgId = stateFor(conversationId).outgoing.at(-1)!.client_msg_id
-    return deliver(conversationId, clientMsgId)
+    const clientMsgId = getOrCreateState(conversationId).outgoing.at(-1)!.client_msg_id
+    return sendOutgoing(conversationId, clientMsgId)
   }
 
-  /** Re-sends a failed message with the same `client_msg_id` (the endpoint is idempotent). */
   async function retry(conversationId: string, clientMsgId: string): Promise<Message | null> {
-    const outgoing = get(conversationId)?.outgoing.find((o) => o.client_msg_id === clientMsgId)
+    const outgoing = findState(conversationId)?.outgoing.find((outgoingMessage) => outgoingMessage.client_msg_id === clientMsgId)
     if (outgoing?.status !== 'failed') return null
-    return deliver(conversationId, clientMsgId)
+    return sendOutgoing(conversationId, clientMsgId)
   }
 
-  /** Drops a failed message from the outgoing list. */
   function discard(conversationId: string, clientMsgId: string): void {
-    const state = stateFor(conversationId)
-    state.outgoing = state.outgoing.filter((o) => o.client_msg_id !== clientMsgId)
+    const state = getOrCreateState(conversationId)
+    state.outgoing = state.outgoing.filter((outgoingMessage) => outgoingMessage.client_msg_id !== clientMsgId)
   }
 
-  return { byConversation, drafts, setDraft, get, stateFor, loadLatest, loadOlder, sync, send, retry, discard }
+  return { stateByConversationId, drafts, setDraft, findState, getOrCreateState, loadLatest, loadOlder, loadMissedMessages, send, retry, discard }
 })

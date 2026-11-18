@@ -39,7 +39,7 @@ watch(
 
 <template>
   <div ref="footer" class="px-2 py-2 text-center text-xs text-base-content/50">
-    <template v-if="store.loading && store.sortedConversations.length">Loading…</template>
+    <template v-if="store.loading && store.conversationsByRecentActivity.length">Loading…</template>
     <template v-else-if="store.error && store.nextCursor">
       <span class="text-error">Couldn't load more.</span>
       <button type="button" class="link ml-1" @click="store.fetchNextPage">Retry</button>

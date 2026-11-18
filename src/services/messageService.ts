@@ -12,7 +12,7 @@ import type {
 } from '@/types/api'
 
 // Paths are relative to `apiBaseUrl` (`/api`), so `/v1/...` hits `/api/v1/...`.
-const enc = encodeURIComponent
+const encodePathSegment = encodeURIComponent
 
 export interface ListConversationsParams {
   limit?: number
@@ -33,7 +33,7 @@ export function listConversations(params: ListConversationsParams = {}, signal?:
 }
 
 export function getConversation(id: string, signal?: AbortSignal) {
-  return http.get<Conversation>(`/v1/conversations/${enc(id)}`, { signal })
+  return http.get<Conversation>(`/v1/conversations/${encodePathSegment(id)}`, { signal })
 }
 
 /** The caller becomes the group's admin. */
@@ -47,7 +47,7 @@ export function getOrCreateDirect(userId: string, signal?: AbortSignal) {
 }
 
 export function listMessages(conversationId: string, params: ListMessagesParams = {}, signal?: AbortSignal) {
-  return http.get<MessagePage>(`/v1/conversations/${enc(conversationId)}/messages`, {
+  return http.get<MessagePage>(`/v1/conversations/${encodePathSegment(conversationId)}/messages`, {
     query: { limit: params.limit, after_seq: params.after_seq, before_seq: params.before_seq },
     signal,
   })
@@ -55,13 +55,13 @@ export function listMessages(conversationId: string, params: ListMessagesParams 
 
 /** Idempotent on `client_msg_id` (201 when created, 200 when it already existed), so retrying is safe. */
 export function sendMessage(conversationId: string, body: MessageCreate, signal?: AbortSignal) {
-  return http.post<Message>(`/v1/conversations/${enc(conversationId)}/messages`, body, { signal })
+  return http.post<Message>(`/v1/conversations/${encodePathSegment(conversationId)}/messages`, body, { signal })
 }
 
 /** The server only moves the read position forward. */
 export function markRead(conversationId: string, seq: number, signal?: AbortSignal) {
   return http.put<ReadPosition>(
-    `/v1/conversations/${enc(conversationId)}/read`,
+    `/v1/conversations/${encodePathSegment(conversationId)}/read`,
     { seq } satisfies ReadUpdate,
     { signal },
   )

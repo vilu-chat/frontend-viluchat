@@ -2,10 +2,9 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Check, X } from '@lucide/vue'
-import { currentSession, listDevUsers } from '@/lib/auth'
 import { useConversationStore } from '@/stores/conversations'
+import { useRelationStore } from '@/stores/relations'
 import { useNewGroupDialog } from '@/composables/useNewGroupDialog'
-import type { DevUser } from '@/types/auth'
 import { ApiError } from '@/utils/http'
 import SearchBar from '@/components/shared/SearchBar.vue'
 import UserAvatar from '@/components/shared/UserAvatar.vue'
@@ -16,6 +15,7 @@ const MAX_MEMBERS = 99
 
 const router = useRouter()
 const conversationStore = useConversationStore()
+const relationStore = useRelationStore()
 const { isOpen, close } = useNewGroupDialog()
 
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -23,24 +23,18 @@ const groupName = ref('')
 const searchQuery = ref('')
 const selectedUserIds = ref<Set<string>>(new Set())
 
-// TODO: swap the auth stub's seeded users for the friends list once that endpoint exists.
-const people = ref<DevUser[]>([])
-const loadingPeople = ref(false)
-const loadPeopleError = ref<string | null>(null)
-
 const creating = ref(false)
 const createError = ref<string | null>(null)
 
 const matchingPeople = computed(() => {
-  const myId = currentSession.value?.user.id
   const query = searchQuery.value.trim().toLowerCase()
-  return people.value
-    .filter((person) => person.id !== myId)
+  return relationStore.friendsByName
+    .map((relation) => relation.user)
     .filter(
       (person) =>
         !query ||
-        person.name.toLowerCase().includes(query) ||
-        person.preferred_username.toLowerCase().includes(query),
+        person.display_name.toLowerCase().includes(query) ||
+        (person.username ?? '').toLowerCase().includes(query),
     )
 })
 
@@ -57,18 +51,6 @@ const whyCreateIsDisabled = computed(() => {
 })
 
 const canCreate = computed(() => !whyCreateIsDisabled.value && !creating.value)
-
-async function loadPeople() {
-  loadingPeople.value = true
-  loadPeopleError.value = null
-  try {
-    people.value = await listDevUsers()
-  } catch (e) {
-    loadPeopleError.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    loadingPeople.value = false
-  }
-}
 
 function resetForm() {
   groupName.value = ''
@@ -92,7 +74,10 @@ async function createGroup() {
   creating.value = true
   createError.value = null
   try {
-    const group = await conversationStore.createGroup(groupName.value.trim(), [...selectedUserIds.value])
+    const group = await conversationStore.createGroup(
+      groupName.value.trim(),
+      [...selectedUserIds.value].filter((id) => relationStore.friendIds.has(id)),
+    )
     // Closed some other way meanwhile (e.g. navigated away): don't yank the user to the chat.
     if (!isOpen.value) return
     close()
@@ -112,7 +97,8 @@ watch(
     if (shouldBeOpen && !el.open) {
       resetForm()
       el.showModal()
-      if (!people.value.length) loadPeople()
+      // Refresh in the background so friends added elsewhere show up.
+      relationStore.fetchAll()
     } else if (!shouldBeOpen && el.open) {
       el.close()
     }
@@ -163,15 +149,20 @@ onBeforeUnmount(close)
             {{ selectedCount }}/{{ MAX_MEMBERS }} selected
           </span>
         </div>
-        <SearchBar v-model="searchQuery" placeholder="Search people" />
+        <SearchBar v-model="searchQuery" placeholder="Search friends" />
 
         <div class="-mx-2 min-h-32 flex-1 overflow-y-auto">
-          <p v-if="loadingPeople" class="px-2 py-2 text-sm text-base-content/50">Loading…</p>
-          <p v-else-if="loadPeopleError" class="px-2 py-2 text-sm text-error">
-            Couldn't load people.
-            <button type="button" class="link" @click="loadPeople">Retry</button>
+          <p v-if="!relationStore.loaded && relationStore.loading" class="px-2 py-2 text-sm text-base-content/50">
+            Loading…
           </p>
-          <p v-else-if="!matchingPeople.length" class="px-2 py-2 text-sm text-base-content/50">No one found.</p>
+          <p v-else-if="relationStore.error && !relationStore.loaded" class="px-2 py-2 text-sm text-error">
+            Couldn't load your friends.
+            <button type="button" class="link" @click="relationStore.fetchAll">Retry</button>
+          </p>
+          <p v-else-if="!relationStore.friendsByName.length" class="px-2 py-2 text-sm text-base-content/50">
+            You can only create a group with your friends. Add friends in the Friends tab first.
+          </p>
+          <p v-else-if="!matchingPeople.length" class="px-2 py-2 text-sm text-base-content/50">No friends found.</p>
           <ul v-else>
             <li v-for="person in matchingPeople" :key="person.id">
               <button
@@ -180,10 +171,10 @@ onBeforeUnmount(close)
                 :aria-pressed="selectedUserIds.has(person.id)"
                 @click="toggleSelected(person.id)"
               >
-                <UserAvatar :name="person.name" />
+                <UserAvatar :name="person.display_name" />
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate font-semibold">{{ person.name }}</span>
-                  <span class="block truncate text-sm text-base-content/50">@{{ person.preferred_username }}</span>
+                  <span class="block truncate font-semibold">{{ person.display_name }}</span>
+                  <span v-if="person.username" class="block truncate text-sm text-base-content/50">@{{ person.username }}</span>
                 </span>
                 <span
                   class="flex size-5 shrink-0 items-center justify-center rounded-full border"

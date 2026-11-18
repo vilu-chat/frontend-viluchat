@@ -24,15 +24,15 @@ const saveError = ref<string | null>(null)
 
 /** Cleared optional fields are sent as `null`. */
 const changedFields = computed<UserUpdate>(() => {
-  const me = users.me
-  if (!me) return {}
+  const currentUser = users.currentUser
+  if (!currentUser) return {}
   const changes: UserUpdate = {}
   const newDisplayName = displayName.value.trim()
-  if (newDisplayName !== me.display_name) changes.display_name = newDisplayName
+  if (newDisplayName !== currentUser.display_name) changes.display_name = newDisplayName
   const newStatusText = statusText.value.trim() || null
-  if (newStatusText !== me.status_text) changes.status_text = newStatusText
+  if (newStatusText !== currentUser.status_text) changes.status_text = newStatusText
   const newBio = bio.value.trim() || null
-  if (newBio !== me.bio) changes.bio = newBio
+  if (newBio !== currentUser.bio) changes.bio = newBio
   return changes
 })
 
@@ -40,9 +40,9 @@ const hasChanges = computed(() => Object.keys(changedFields.value).length > 0)
 const canSave = computed(() => !!displayName.value.trim() && hasChanges.value && !saving.value)
 
 function fillFormFromProfile() {
-  displayName.value = users.me?.display_name ?? ''
-  statusText.value = users.me?.status_text ?? ''
-  bio.value = users.me?.bio ?? ''
+  displayName.value = users.currentUser?.display_name ?? ''
+  statusText.value = users.currentUser?.status_text ?? ''
+  bio.value = users.currentUser?.bio ?? ''
   saveError.value = null
 }
 
@@ -55,7 +55,7 @@ async function save() {
   saving.value = true
   saveError.value = null
   try {
-    await users.updateMe(changedFields.value)
+    await users.updateCurrentUser(changedFields.value)
     isOpen.value = false
   } catch (e) {
     saveError.value = ApiError.from(e).message || "Couldn't save your profile."
@@ -67,7 +67,7 @@ async function save() {
 // Opened before `GET /users/me` returned: fill the form once the profile arrives, so an untouched
 // status and bio aren't saved as cleared.
 watch(
-  () => users.me,
+  () => users.currentUser,
   (me, previousMe) => {
     if (isOpen.value && me && !previousMe) fillFormFromProfile()
   },
@@ -106,13 +106,13 @@ watch(
         </button>
       </div>
 
-      <p v-if="!users.me" class="text-sm text-base-content/50">Your profile hasn't loaded yet.</p>
+      <p v-if="!users.currentUser" class="text-sm text-base-content/50">Your profile hasn't loaded yet.</p>
 
       <template v-else>
         <div class="flex items-center gap-3">
-          <UserAvatar :name="displayName.trim() || users.me.display_name" />
+          <UserAvatar :name="displayName.trim() || users.currentUser.display_name" />
           <div class="min-w-0">
-            <div class="truncate font-semibold">{{ displayName.trim() || users.me.display_name }}</div>
+            <div class="truncate font-semibold">{{ displayName.trim() || users.currentUser.display_name }}</div>
             <div class="truncate text-sm text-base-content/50">{{ statusText.trim() || 'No status' }}</div>
           </div>
         </div>

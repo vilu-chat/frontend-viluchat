@@ -33,7 +33,14 @@ export const router = createRouter({
           },
           props: { default: true },
         },
-        { path: 'friends', name: 'friends', component: () => import('@/views/FriendsView.vue') },
+        {
+          path: 'friends',
+          name: 'friends',
+          components: {
+            default: () => import('@/views/FriendsView.vue'),
+            sidebar: () => import('@/components/friends/FriendList.vue'),
+          },
+        },
         {
           path: 'groups',
           name: 'groups',

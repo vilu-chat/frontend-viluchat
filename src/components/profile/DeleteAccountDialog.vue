@@ -24,7 +24,7 @@ async function deleteAccount() {
   deleting.value = true
   deleteError.value = null
   try {
-    await users.deleteMe()
+    await users.deleteCurrentUser()
     // Full page load to /login, which also drops all cached data.
     logout('account_deleted')
   } catch (e) {

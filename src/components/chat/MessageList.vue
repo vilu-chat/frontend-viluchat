@@ -33,7 +33,7 @@ type Row = MessageRow | { kind: 'day'; key: string; label: string } | { kind: 'u
 
 const messageStore = useMessageStore()
 const users = useUserStore()
-const conversationMessages = computed(() => messageStore.get(props.conversationId))
+const conversationMessages = computed(() => messageStore.findState(props.conversationId))
 const scrollContainer = ref<HTMLElement | null>(null)
 const showJumpToLatest = ref(false)
 let initialScrollDone = false
@@ -41,7 +41,7 @@ let initialScrollDone = false
 const rows = computed<Row[]>(() => {
   const state = conversationMessages.value
   if (!state) return []
-  const myId = users.me?.id ?? ''
+  const currentUserId = users.currentUser?.id ?? ''
 
   const messages: Omit<MessageRow, 'showHeader'>[] = [
     ...state.messages.map((m) => ({
@@ -61,7 +61,7 @@ const rows = computed<Row[]>(() => {
       key: o.client_msg_id,
       seq: null,
       body: o.body,
-      senderId: myId,
+      senderId: currentUserId,
       createdAt: o.created_at,
       editedAt: null,
       deletedAt: null,
@@ -75,7 +75,7 @@ const rows = computed<Row[]>(() => {
   const unreadLineIndex =
     firstUnreadSeq == null
       ? -1
-      : messages.findIndex((m) => m.seq !== null && m.seq >= firstUnreadSeq && m.senderId !== myId)
+      : messages.findIndex((m) => m.seq !== null && m.seq >= firstUnreadSeq && m.senderId !== currentUserId)
 
   const result: Row[] = []
   messages.forEach((message, i) => {

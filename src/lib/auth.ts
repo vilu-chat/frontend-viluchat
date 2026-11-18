@@ -16,7 +16,7 @@ const RENEW_MARGIN_MS = 30_000
 
 const session = ref<AuthSession | null>(loadSession())
 /** In-flight token request, shared so concurrent callers don't each fetch a token. */
-let renewing: Promise<string | null> | null = null
+let tokenRenewalInFlight: Promise<string | null> | null = null
 
 /** The logged-in user, reactive and read-only. */
 export const currentSession = readonly(session)
@@ -86,7 +86,7 @@ export async function login(user: DevUser): Promise<void> {
  */
 export function logout(reason?: LogoutReason): void {
   saveSession(null)
-  renewing = null
+  tokenRenewalInFlight = null
   const query = reason ? `?reason=${reason}` : ''
   window.location.assign(`/login${query}`)
 }
@@ -96,7 +96,7 @@ function renewToken(): Promise<string | null> {
   const current = session.value
   if (!current) return Promise.resolve(null)
 
-  renewing ??= requestToken(current.user.preferred_username)
+  tokenRenewalInFlight ??= requestToken(current.user.preferred_username)
     .then((token) => {
       // Ignore the result if the user logged out or switched in the meantime.
       if (session.value?.user.id !== current.user.id) return null
@@ -105,9 +105,9 @@ function renewToken(): Promise<string | null> {
     })
     .catch(() => null)
     .finally(() => {
-      renewing = null
+      tokenRenewalInFlight = null
     })
-  return renewing
+  return tokenRenewalInFlight
 }
 
 /** Current access token, renewed first when it is about to expire. `null` when logged out. */
